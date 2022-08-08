@@ -39,10 +39,13 @@
 #include "Viewer.h"
 #include "ImuTypes.h"
 #include "Settings.h"
+#include "PointCloudMapping.hpp"
 
 
 namespace ORB_SLAM3
 {
+
+class PointCloudMapping;
 
 class Verbose
 {
@@ -171,6 +174,8 @@ public:
     // SaveMap(const string &filename);
     // LoadMap(const string &filename);
 
+    void SavePointCloud(const string &filename);
+
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)
     int GetTrackingState();
@@ -185,6 +190,8 @@ public:
     void ChangeDataset();
 
     float GetImageScale();
+
+    shared_ptr<PointCloudMapping> mpPointCloudMapping;
 
 #ifdef REGISTER_TIMES
     void InsertRectTime(double& time);

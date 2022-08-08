@@ -32,11 +32,12 @@
 namespace ORB_SLAM3
 {
 
-LoopClosing::LoopClosing(Atlas *pAtlas, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale, const bool bActiveLC):
+LoopClosing::LoopClosing(Atlas *pAtlas, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale, const bool bActiveLC, std::shared_ptr<PointCloudMapping> pPointCloud):
     mbResetRequested(false), mbResetActiveMapRequested(false), mbFinishRequested(false), mbFinished(true), mpAtlas(pAtlas),
     mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mpMatchedKF(NULL), mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
     mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0), mnLoopNumCoincidences(0), mnMergeNumCoincidences(0),
-    mbLoopDetected(false), mbMergeDetected(false), mnLoopNumNotFound(0), mnMergeNumNotFound(0), mbActiveLC(bActiveLC)
+    mbLoopDetected(false), mbMergeDetected(false), mnLoopNumNotFound(0), mnMergeNumNotFound(0), mbActiveLC(bActiveLC),
+    mpPointCloudMapping(pPointCloud), loop_count(0)
 {
     mnCovisibilityConsistencyTh = 3;
     mpLastCurrentKF = static_cast<KeyFrame*>(NULL);
@@ -982,7 +983,7 @@ void LoopClosing::CorrectLoop()
         unique_lock<mutex> lock(mMutexGBA);
         mbStopGBA = true;
 
-        mnFullBAIdx++;
+        mnFullBAIdx += 1;
 
         if(mpThreadGBA)
         {
@@ -1233,7 +1234,7 @@ void LoopClosing::MergeLocal()
         unique_lock<mutex> lock(mMutexGBA);
         mbStopGBA = true;
 
-        mnFullBAIdx++;
+        mnFullBAIdx += 1;
 
         if(mpThreadGBA)
         {
@@ -1806,7 +1807,7 @@ void LoopClosing::MergeLocal2()
         unique_lock<mutex> lock(mMutexGBA);
         mbStopGBA = true;
 
-        mnFullBAIdx++;
+        mnFullBAIdx += 1;
 
         if(mpThreadGBA)
         {
@@ -2268,6 +2269,8 @@ void LoopClosing::ResetIfRequested()
 void LoopClosing::RunGlobalBundleAdjustment(Map* pActiveMap, unsigned long nLoopKF)
 {  
     Verbose::PrintMess("Starting Global Bundle Adjustment", Verbose::VERBOSITY_NORMAL);
+    std::unique_lock<std::mutex> lck_loop_busy(mpPointCloudMapping->loop_busy_mutex);
+    mpPointCloudMapping->loop_busy = true;
 
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_StartFGBA = std::chrono::steady_clock::now();
@@ -2492,6 +2495,12 @@ void LoopClosing::RunGlobalBundleAdjustment(Map* pActiveMap, unsigned long nLoop
             // mpTracker->UpdateFrameIMU(1.0f, mpTracker->GetLastKeyFrame()->GetImuBias(), mpTracker->GetLastKeyFrame());
 
             mpLocalMapper->Release();
+
+            lck_loop_busy.unlock();
+            ++loop_count;
+            while (loop_count != mpPointCloudMapping->loop_count)
+                mpPointCloudMapping->loopClosingUpdate();
+            Verbose::PrintMess(("mpPointCloudMapping->loop_count = " + std::to_string(mpPointCloudMapping->loop_count)), Verbose::VERBOSITY_NORMAL);
 
 #ifdef REGISTER_TIMES
             std::chrono::steady_clock::time_point time_EndUpdateMap = std::chrono::steady_clock::now();

@@ -25,6 +25,7 @@
 #include "Atlas.h"
 #include "ORBVocabulary.h"
 #include "Tracking.h"
+#include "PointCloudMapping.hpp"
 
 #include "KeyFrameDatabase.h"
 
@@ -40,6 +41,7 @@ class Tracking;
 class LocalMapping;
 class KeyFrameDatabase;
 class Map;
+class PointCloudMapping;
 
 
 class LoopClosing
@@ -52,7 +54,7 @@ public:
 
 public:
 
-    LoopClosing(Atlas* pAtlas, KeyFrameDatabase* pDB, ORBVocabulary* pVoc,const bool bFixScale, const bool bActiveLC);
+    LoopClosing(Atlas* pAtlas, KeyFrameDatabase* pDB, ORBVocabulary* pVoc,const bool bFixScale, const bool bActiveLC, std::shared_ptr<PointCloudMapping> pPointCloud);
 
     void SetTracker(Tracking* pTracker);
 
@@ -116,6 +118,7 @@ public:
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+    int loop_count;
 protected:
 
     bool CheckNewKeyFrames();
@@ -239,6 +242,8 @@ protected:
 
     // To (de)activate LC
     bool mbActiveLC = true;
+
+    std::shared_ptr<PointCloudMapping> mpPointCloudMapping;
 
 #ifdef REGISTER_LOOP
     string mstrFolderLoop;

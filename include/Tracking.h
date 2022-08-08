@@ -36,6 +36,7 @@
 #include "System.h"
 #include "ImuTypes.h"
 #include "Settings.h"
+#include "PointCloudMapping.hpp"
 
 #include "GeometricCamera.h"
 
@@ -52,6 +53,7 @@ class LocalMapping;
 class LoopClosing;
 class System;
 class Settings;
+class PointCloudMapping;
 
 class Tracking
 {  
@@ -59,6 +61,7 @@ class Tracking
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,
+             std::shared_ptr<PointCloudMapping> pPointCloud,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, Settings* settings, const string &_nameSeq=std::string());
 
     ~Tracking();
@@ -139,6 +142,8 @@ public:
     Frame mLastFrame;
 
     cv::Mat mImGray;
+    cv::Mat mImRGB;
+    cv::Mat mImDepth;
 
     // Initialization Variables (Monocular)
     std::vector<int> mvIniLastMatches;
@@ -356,6 +361,9 @@ protected:
     Sophus::SE3f mTlr;
 
     void newParameterLoader(Settings* settings);
+
+    //For point cloud module
+    std::shared_ptr<PointCloudMapping> mpPointCloudMapping;
 
 #ifdef REGISTER_LOOP
     bool Stop();

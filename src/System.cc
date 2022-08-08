@@ -74,6 +74,12 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
        exit(-1);
     }
 
+    // for point cloud resolution
+    double resolution = fsSettings["PointCloudMapping.Resolution"];
+    double meank = fsSettings["meank"];
+    double thresh = fsSettings["thresh"];
+    double depth_map_factor = fsSettings["RGBD.DepthMapFactor"];
+
     cv::FileNode node = fsSettings["File.version"];
     if(!node.empty() && node.isString() && node.string() == "1.0"){
         settings_ = new Settings(strSettingsFile,mSensor);
@@ -185,11 +191,14 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpFrameDrawer = new FrameDrawer(mpAtlas);
     mpMapDrawer = new MapDrawer(mpAtlas, strSettingsFile, settings_);
 
+    //Create the Point Cloud Mapper. It generate point cloud from RGB-D images.
+    mpPointCloudMapping = std::make_shared<PointCloudMapping>(depth_map_factor, resolution, meank, thresh);
+
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
     cout << "Seq. Name: " << strSequence << endl;
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
+                             mpAtlas, mpPointCloudMapping, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
@@ -210,7 +219,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Initialize the Loop Closing thread and launch
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
-    mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);
+    mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC, mpPointCloudMapping); // mSensor!=MONOCULAR);
     mptLoopClosing = new thread(&ORB_SLAM3::LoopClosing::Run, mpLoopCloser);
 
     //Set pointers between threads
@@ -523,6 +532,7 @@ void System::Shutdown()
 
     mpLocalMapper->RequestFinish();
     mpLoopCloser->RequestFinish();
+    mpPointCloudMapping->shutdown();
     /*if(mpViewer)
     {
         mpViewer->RequestFinish();
@@ -1259,6 +1269,12 @@ void System::SaveTrajectoryKITTI(const string &filename)
              Rwc(2,0) << " " << Rwc(2,1)  << " " << Rwc(2,2) << " "  << twc(2) << endl;
     }
     f.close();
+}
+
+
+void System::SavePointCloud(const string &filename)
+{
+    this->mpPointCloudMapping->savePointCloud(filename);
 }
 
 
