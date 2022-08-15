@@ -152,6 +152,12 @@ endif()
 
 # Build examples
 
+# Joss Lei added, RGB-D lab example
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR})
+add_executable(rgbd_lab
+        rgbd_lab.cc)
+target_link_libraries(rgbd_lab ${PROJECT_NAME})
+
 # RGB-D examples
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/RGB-D)
 
