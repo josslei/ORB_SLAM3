@@ -69,6 +69,10 @@ public:
     bool loop_busy;
     std::mutex loop_busy_mutex;
 
+    //const std::vector<KeyFrame*> * getKeyframes()       { return &(this->keyframes); }
+    //std::mutex &                   getKeyframeMutex()   { return this->keyframe_mutex; }
+    //std::condition_variable &      getKeyframeUpdate()  { return this->keyframe_update; }
+
 private:
     PointCloud::Ptr generatePointCloud(KeyFrame *kf, cv::Mat color, cv::Mat depth);
 

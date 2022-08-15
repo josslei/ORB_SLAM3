@@ -55,7 +55,11 @@ namespace ORB_SLAM3 {
 
     void PointCloudMapping::savePointCloud(const std::string &filename)
     {
-        pcl::io::savePCDFile(filename, *(this->global_map));
+        std::unique_lock<std::mutex> lck_global_map(this->global_map_mutex);
+        PointCloud::Ptr tmp(new PointCloud);
+        this->voxel.setInputCloud(this->global_map);
+        this->voxel.filter(*tmp);
+        pcl::io::savePCDFileBinary(filename, *(tmp));
         Verbose::PrintMess("PCD file saved to \"" + filename + "\"\n", Verbose::VERBOSITY_NORMAL);
     }
 
@@ -123,7 +127,7 @@ namespace ORB_SLAM3 {
 
     void PointCloudMapping::viewer()
     {
-        //pcl::visualization::CloudViewer viewer("Point Cloud Viewer");
+        pcl::visualization::CloudViewer viewer("Point Cloud Viewer");
         //pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Point Cloud Viewer"));
         while (true)
         {
@@ -168,7 +172,12 @@ namespace ORB_SLAM3 {
                 // voxel.filter(*(this->global_map));
                 this->global_map->swap(*tmp1);
 
-                //viewer.showCloud(this->global_map);
+                if (N > 5)
+                {
+                    pcl::io::savePCDFileBinary("tmp.pcd", *(this->point_cloud[this->point_cloud.size() - 1].pc));
+                }
+                //viewer.showCloud(this->point_cloud[this->point_cloud.size() - 1].pc);
+                viewer.showCloud(this->global_map);
                 Verbose::PrintMess("Showing global map, size = " + std::to_string(N) + ", " + std::to_string(this->global_map->points.size()) + '\n',
                                    Verbose::VERBOSITY_NORMAL);
                 this->last_keyframe_size = N;
@@ -179,8 +188,8 @@ namespace ORB_SLAM3 {
 
     PointCloudMapping::PointCloud::Ptr PointCloudMapping::generatePointCloud(KeyFrame *kf, cv::Mat color, cv::Mat depth)
     {
-        // cv::imshow("Color", color);
-        // cv::imshow("Depth", depth);
+        //cv::imshow("Color", color);
+        //cv::imshow("Depth", depth);
         PointCloud::Ptr tmp(new PointCloud());
         for (int m = 0; m < depth.rows; ++m)
         {
