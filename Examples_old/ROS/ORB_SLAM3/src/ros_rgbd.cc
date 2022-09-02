@@ -78,6 +78,8 @@ int main(int argc, char **argv)
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
     // Save point cloud
+    cout << "Regenerating point cloud...\n";
+    SLAM.RegeneratePointCloud();
     cout << "Saveing point cloud...\n";
     SLAM.SavePointCloud("PointCloud.pcd");
     cout << "Done.\n";

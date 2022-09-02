@@ -28,6 +28,7 @@
 #define ORB_SLAM3_POINTCLOUDMAPPING_HPP
 
 #include "System.h"
+#include "Tracking.h"
 #include <pcl/common/transforms.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
@@ -40,6 +41,8 @@
 #include <string>
 
 namespace ORB_SLAM3 {
+
+class Tracking;
 
 class PointCloudFragment
 {
@@ -58,12 +61,24 @@ public:
     typedef pcl::PointCloud<PointT> PointCloud;
 
     PointCloudMapping(double depth_map_factor, double resolution = 0.04, double meank = 50, double thresh = 1);
+
+    const Tracking * mpTracker;
+    void setTrackerPtr(const Tracking * tracker_ptr) { this->mpTracker = tracker_ptr; }
+
     void savePointCloud(const std::string &filename);
     void shutdown();
 
+    //cv::Mat kf_Two;         // Transformation of the origin keyframe
+    //bool first_keyframe;
     void insertKeyframe(KeyFrame *kf, cv::Mat color, cv::Mat depth, int idk, std::vector<KeyFrame*> vpKFs);
     void loopClosingUpdate();
     void viewer();
+
+    void regeneratePointCloud();
+    const std::vector<cv::Mat> * getKeyFramesColor() { return &(this->kf_colors); }
+    const std::vector<cv::Mat> * getKeyFramesDepth() { return &(this->kf_depths); }
+    // current_vpKFs
+    const std::vector<KeyFrame*> * getKeyFrames() { return &(this->current_vpKFs); }
 
     int loop_count;
     bool loop_busy;
@@ -95,6 +110,9 @@ private:
     std::mutex keyframe_update_mutex;
 
     std::vector<PointCloudFragment> point_cloud;
+    // Keyframe images
+    std::vector<cv::Mat> kf_colors;
+    std::vector<cv::Mat> kf_depths;
     // data to generate point clouds
     std::vector<KeyFrame*>  current_vpKFs;
     std::vector<KeyFrame*>  keyframes;

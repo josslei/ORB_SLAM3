@@ -200,6 +200,9 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
                              mpAtlas, mpPointCloudMapping, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 
+    mpPointCloudMapping->setTrackerPtr(mpTracker);
+    cout << "Passed\n";
+
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
                                      mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
@@ -1275,6 +1278,30 @@ void System::SaveTrajectoryKITTI(const string &filename)
 void System::SavePointCloud(const string &filename)
 {
     this->mpPointCloudMapping->savePointCloud(filename);
+}
+
+
+void System::RegeneratePointCloud()
+{
+    this->mpPointCloudMapping->regeneratePointCloud();
+}
+
+
+const std::vector<cv::Mat> * System::GetKeyFramesColor()
+{
+    return this->mpPointCloudMapping->getKeyFramesColor();
+}
+
+
+const std::vector<cv::Mat> * System::GetKeyFramesDepth()
+{
+    return this->mpPointCloudMapping->getKeyFramesDepth();
+}
+
+
+const std::vector<KeyFrame*> * System::GetKeyFrames()
+{
+    return this->mpPointCloudMapping->getKeyFrames();
 }
 
 

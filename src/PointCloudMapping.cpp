@@ -61,6 +61,19 @@ namespace ORB_SLAM3 {
         this->voxel.filter(*tmp);
         pcl::io::savePCDFileBinary(filename, *(tmp));
         Verbose::PrintMess("PCD file saved to \"" + filename + "\"\n", Verbose::VERBOSITY_NORMAL);
+
+        Verbose::PrintMess("Saving keyframse to ~/Keyframs/", Verbose::VERBOSITY_QUIET);
+        std::ofstream fposes("/home/josslei/Keyframes/poses.txt");
+        for (int i = 0; i < this->kf_colors.size(); ++i)
+        {
+            // save color and depth images
+            cv::imwrite(std::string("/home/josslei/Keyframes/color/") + std::to_string(i) + string(".png"), this->kf_colors[i]);
+            cv::imwrite(std::string("/home/josslei/Keyframes/depth/") + std::to_string(i) + string(".png"), this->kf_depths[i]);
+            // save poses
+            Eigen::Isometry3d T = ORB_SLAM3::Converter::toSE3Quat(this->keyframes[i]->GetPoseInverse());
+            fposes << T.matrix() << "\n\n";
+            //this->current_vpKFs[i]->GetPose()
+        }
     }
 
     void PointCloudMapping::shutdown()
@@ -81,12 +94,19 @@ namespace ORB_SLAM3 {
         std::unique_lock<std::mutex> lck(this->keyframe_mutex);
         this->keyframes.push_back(kf);
         this->current_vpKFs = vpKFs;
+        this->kf_colors.push_back(color);
+        this->kf_depths.push_back(depth);
 
         PointCloudFragment pointcloudfrg;
         pointcloudfrg.pc_id = idk;
         pointcloudfrg.T = ORB_SLAM3::Converter::toSE3Quat(kf->GetPose());
         pointcloudfrg.pc = this->generatePointCloud(kf, color, depth);
         this->point_cloud.push_back(pointcloudfrg);
+
+        //cout << "==========\nKeyfram id: " << kf->mnId << "\nPTM Matrix:\n"<< pointcloudfrg.T.inverse().matrix()
+        //     << "\nORB_SLAM# Matrix:\n" << kf->GetPoseInverse().matrix()
+        //     << "\n=========\n";
+
         this->keyframe_update.notify_one();
     }
 
@@ -107,8 +127,8 @@ namespace ORB_SLAM3 {
                     {
                         if(this->point_cloud[j].pc_id == this->current_vpKFs[i]->mnFrameId)
                         {
-                            Eigen::Isometry3d T = ORB_SLAM3::Converter::toSE3Quat(this->keyframes[i]->GetPose());
-                            // Eigen::Isometry3d T = ORB_SLAM3::Converter::toSE3Quat(this->current_vpKFs[i]->GetPose());
+                            // Eigen::Isometry3d T = ORB_SLAM3::Converter::toSE3Quat(this->keyframes[i]->GetPose());
+                            Eigen::Isometry3d T = ORB_SLAM3::Converter::toSE3Quat(this->current_vpKFs[i]->GetPose());
                             PointCloud::Ptr cloud(new PointCloud);
                             pcl::transformPointCloud(*this->point_cloud[j].pc, *cloud, T.inverse().matrix());
                             *tmp1 += *cloud;
@@ -172,10 +192,6 @@ namespace ORB_SLAM3 {
                 // voxel.filter(*(this->global_map));
                 this->global_map->swap(*tmp1);
 
-                if (N > 5)
-                {
-                    pcl::io::savePCDFileBinary("tmp.pcd", *(this->point_cloud[this->point_cloud.size() - 1].pc));
-                }
                 //viewer.showCloud(this->point_cloud[this->point_cloud.size() - 1].pc);
                 viewer.showCloud(this->global_map);
                 Verbose::PrintMess("Showing global map, size = " + std::to_string(N) + ", " + std::to_string(this->global_map->points.size()) + '\n',
@@ -184,6 +200,92 @@ namespace ORB_SLAM3 {
                 this->cloud_busy = false;
             }
         }
+    }
+
+    void PointCloudMapping::regeneratePointCloud()
+    {
+        cout << "Starting to regenerate...\n";
+        this->global_map = std::make_shared<PointCloud>();
+
+        //vector<KeyFrame*> vpKFs = this->current_vpKFs;
+        vector<KeyFrame*> vpKFs = this->keyframes;
+        sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
+
+        for(size_t i=0; i<vpKFs.size(); i++)
+        {
+            KeyFrame* pKF = vpKFs[i];
+
+            // pKF->SetPose(pKF->GetPose()*Two);
+
+            if(pKF->isBad())
+                continue;
+            if(i % 5 != 0)
+                continue;
+
+            Sophus::SE3f Twc = pKF->GetPoseInverse();
+
+            PointCloudFragment pointcloudfrg;
+            pointcloudfrg.pc = this->generatePointCloud(pKF, this->kf_colors[i], this->kf_depths[i]);
+
+            PointCloud::Ptr p(new PointCloud);
+            pcl::transformPointCloud(*(this->point_cloud)[i].pc, *p, Twc.matrix());
+            *(this->global_map) += *p;
+        }
+        PointCloud::Ptr tmp1(new PointCloud);
+        statistical_filter.setInputCloud(this->global_map);
+        statistical_filter.filter(*tmp1);
+        this->global_map->swap(*tmp1);
+
+        /*
+        // The first keyframe as the origin
+        auto Two = this->current_vpKFs[0]->GetPoseInverse();
+
+        // Iterate all Keyframes
+
+        // List of keyframes
+        auto lRit = mpTracker->mlpReferences.begin();//list<ORB_SLAM3::KeyFrame*>::iterator;
+        // List of relative poses
+        auto lit = mpTracker->mlRelativeFramePoses.begin();
+        auto lend = mpTracker->mlRelativeFramePoses.end();
+        cout << "Iteration start...\n";
+        cout << this->kf_colors.size() << '\n';
+        for (int i = 0; lit != lend; ++lit, ++lRit, ++i)
+        {
+            cout << "Index: " << i << '\n';
+            KeyFrame *pKF = *lRit;
+            Sophus::SE3f Trw;
+            // If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
+            while(pKF->isBad())
+            {
+                cout << "Keyframe " << pKF->mnId << " is bad!\n";
+                Trw = Trw * pKF->mTcp;
+                pKF = pKF->GetParent();
+            }
+            cout << "Stage 1\n";
+            Trw = Trw * pKF->GetPose() * Two;
+            Sophus::SE3f Tcw = (*lit) * Trw;
+            Sophus::SE3f Twc = Tcw.inverse();
+
+            if (i >= this->kf_colors.size())
+                continue;
+
+            cout << "Stage 2\n";
+            PointCloudFragment pointcloudfrg;
+            pointcloudfrg.pc = this->generatePointCloud(pKF, this->kf_colors[i], this->kf_depths[i]);
+
+            cout << "Stage 3\n";
+            PointCloud::Ptr p(new PointCloud);
+            pcl::transformPointCloud(*(this->point_cloud)[i].pc, *p, Twc.matrix());
+            cout << "Stage 4\n";
+            *(this->global_map) += *p;
+            cout << "<<<<<<<<<<<<<<\ni: " << i << "\n<<<<<<<<<<<<<<\n";
+        }
+        // Depth filter and statistical removal
+        PointCloud::Ptr tmp1(new PointCloud);
+        statistical_filter.setInputCloud(this->global_map);
+        statistical_filter.filter(*tmp1);
+        this->global_map->swap(*tmp1);
+        */
     }
 
     PointCloudMapping::PointCloud::Ptr PointCloudMapping::generatePointCloud(KeyFrame *kf, cv::Mat color, cv::Mat depth)

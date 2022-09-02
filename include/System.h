@@ -175,6 +175,10 @@ public:
     // LoadMap(const string &filename);
 
     void SavePointCloud(const string &filename);
+    void RegeneratePointCloud();
+    const std::vector<cv::Mat> * GetKeyFramesColor();
+    const std::vector<cv::Mat> * GetKeyFramesDepth();
+    const std::vector<KeyFrame*> * GetKeyFrames();
 
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)
