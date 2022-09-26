@@ -66,6 +66,7 @@ namespace ORB_SLAM3 {
         std::ofstream fposes("/home/josslei/Keyframes/poses.txt");
         for (int i = 0; i < this->kf_colors.size(); ++i)
         {
+            cv::cvtColor(kf_colors[i].clone(), kf_colors[i], cv::COLOR_BGR2RGB);
             // save color and depth images
             cv::imwrite(std::string("/home/josslei/Keyframes/color/") + std::to_string(i) + string(".png"), this->kf_colors[i]);
             cv::imwrite(std::string("/home/josslei/Keyframes/depth/") + std::to_string(i) + string(".png"), this->kf_depths[i]);
